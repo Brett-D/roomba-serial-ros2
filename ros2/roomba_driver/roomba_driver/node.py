@@ -395,7 +395,7 @@ class RoombaDriver(Node):
                 f'Call roomba/set_mode with mode 2 (safe) or 3 (full).', throttle_duration_sec=5.0)
         return False
 
-    def _drive(self, action, moving, what, forward=False):
+    def _drive(self, action, moving, what, forward=False, reverse=False):
         if self._backup is not None or self._backup_request:
             self.get_logger().info(f'ignoring {what} during the bump backup', throttle_duration_sec=2.0)
             return
@@ -404,10 +404,13 @@ class RoombaDriver(Node):
             if self.robot.is_open and self._try(action, what):
                 self._driving = self._driving_forward = False
             return
-        if forward and self.bump_stop and self._bumped:
+        if self.bump_stop and self._bumped and not reverse:
+            # Pressed against something: turning in place there can climb it (it once drove up a
+            # railing's base rail while turning), so any motion except straight back backs off first.
             if self._request_backup(time.monotonic()):
-                self.get_logger().warning(f'forward {what} while the bumper is pressed: backing up')
+                self.get_logger().warning(f'{what} while the bumper is pressed: backing up')
                 return
+        if forward and self.bump_stop and self._bumped:
             self.get_logger().warning(f'ignoring forward {what}: bumper pressed (reverse or turn to get free)',
                                       throttle_duration_sec=2.0)
             if self._driving_forward and self._try(self.robot.stop_drive, 'stop on bump'):
@@ -439,21 +442,21 @@ class RoombaDriver(Node):
                                             self.max_wheel_speed)
         left_mm, right_mm = round(left * 1000), round(right * 1000)
         self._drive(lambda: self.robot.drive_direct(left_mm, right_mm), bool(left_mm or right_mm), 'cmd_vel',
-                    forward=left_mm + right_mm > 0)
+                    forward=left_mm + right_mm > 0, reverse=left_mm < 0 and right_mm < 0)
 
     def _on_drive(self, msg):
         limit = self.max_wheel_speed * 1000
         velocity = max(-limit, min(limit, msg.velocity_mm_s))
         spin = msg.radius_mm in (oi.RADIUS_TURN_CW, oi.RADIUS_TURN_CCW)
         self._drive(lambda: self.robot.drive(velocity, msg.radius_mm), bool(velocity), 'roomba/drive',
-                    forward=velocity > 0 and not spin)
+                    forward=velocity > 0 and not spin, reverse=velocity < 0 and not spin)
 
     def _on_drive_direct(self, msg):
         limit = self.max_wheel_speed * 1000
         left = max(-limit, min(limit, msg.left_mm_s))
         right = max(-limit, min(limit, msg.right_mm_s))
         self._drive(lambda: self.robot.drive_direct(left, right), bool(left or right), 'roomba/drive_direct',
-                    forward=left + right > 0)
+                    forward=left + right > 0, reverse=left < 0 and right < 0)
 
     def _on_drive_pwm(self, msg):
         self._drive(lambda: self.robot.drive_pwm(msg.left_pwm, msg.right_pwm),
