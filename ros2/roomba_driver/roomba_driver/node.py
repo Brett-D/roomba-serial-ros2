@@ -256,6 +256,11 @@ class RoombaDriver(Node):
             blockers = self._blockers(values)
             reason = f' ({blockers})' if blockers else ''
             self._driving = self._driving_forward = False
+            if not blockers and self._desired_mode in CONTROL_MODES:
+                # Nothing unsafe happened (no cliff, wheel drop or charger): the OI was restarted
+                # (e.g. a stream restart or a robot reset). Go back to the requested mode.
+                reason = ' (no safety reason; re-entering ' + oi.MODE_NAMES[self._desired_mode] + ')'
+                self._try(lambda: self.robot.request_mode(self._desired_mode), 're-enter mode')
         self.get_logger().info(f'OI mode {oi.MODE_NAMES.get(previous, previous)} -> {name}{reason}')
 
     @staticmethod

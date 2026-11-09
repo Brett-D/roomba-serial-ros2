@@ -424,6 +424,7 @@ class Roomba:
         last_restart = 0.0
         last_wake = 0.0
         last_stall_warning = 0.0
+        restarts = 0                      # stream restarts since the last good frame
         while self._running:
             ser = self._ser
             if ser is None or not ser.is_open:
@@ -440,6 +441,7 @@ class Roomba:
             got_secondary = False
             for frame_n, values in self._parser.feed_frames(data) if data else ():
                 last_frame = now
+                restarts = 0
                 got_secondary |= frame_n == self._secondary_n
                 self._deliver(values, now)
             try:
@@ -448,17 +450,22 @@ class Roomba:
                 self.log.warning(str(e))
             if self._stream_wanted and now - last_frame > self.stream_timeout and now - last_restart > 1.0:
                 last_restart = now
-                if now - last_stall_warning > 30.0:
+                restarts += 1
+                if restarts > 1 and now - last_stall_warning > 30.0:
                     last_stall_warning = now
                     self.log.warning('no sensor data from the Roomba (asleep?); restarting the stream')
                 try:
-                    if self.wake_with_dtr and now - last_wake > 5.0:
+                    if self.wake_with_dtr and restarts > 1 and now - last_wake > 5.0:
                         last_wake = now
                         self.wake()
                     with self._io_lock:
                         if self._stream_wanted and self._running:
-                            self.start()
-                            time.sleep(0.02)
+                            # Mode changes pause the stream for ~0.3-0.5 s, so first just ask
+                            # for it again: Start (128) would also drop Safe/Full to Passive.
+                            # Only if that fails is the OI restarted (robot rebooted / woke up).
+                            if restarts > 1:
+                                self.start()
+                                time.sleep(0.02)
                             self._request_stream()
                 except RoombaError as e:
                     self.log.warning(str(e))

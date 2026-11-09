@@ -29,7 +29,10 @@ Never connect pins 1-2 (raw battery, 14-17 V).
 | full | Full control with **no** cliff or wheel-drop protection. |
 
 The driver enters `initial_mode` (default `safe`) at startup. Drive, LED, display and song
-commands are ignored with a warning unless the robot is in safe or full mode. Each drive input
+commands are ignored with a warning unless the robot is in safe or full mode. If the robot drops
+to passive *without* a safety reason (no cliff, wheel drop or charger; e.g. the robot reset), the
+driver re-enters the requested mode by itself. After a safety drop it stays in passive until
+`roomba/set_mode` is called (or `auto_reenter_mode` is set). Each drive input
 stops the wheels if no new command arrives within `cmd_vel_timeout_s`. On shutdown the driver
 stops the motors and returns the robot to passive.
 
