@@ -1,0 +1,8 @@
+# Opcode 140 (and 141 if play is true). Songs 0-4, up to 16 notes each.
+uint8 song_number
+uint8[] notes       # MIDI note numbers 31-127; anything else is a rest
+uint8[] durations   # in 1/64 s, one per note
+bool play           # play immediately (requires Safe or Full mode)
+---
+bool success
+string message

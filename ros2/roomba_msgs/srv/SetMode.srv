@@ -1,0 +1,10 @@
+uint8 MODE_OFF=0       # opcode 173 (stops the OI; not supported by all 500 firmware)
+uint8 MODE_PASSIVE=1   # opcode 128: sensors only, buttons work
+uint8 MODE_SAFE=2      # opcode 131: full control, stops on cliff / wheel drop / charger
+uint8 MODE_FULL=3      # opcode 132: full control, NO cliff or wheel-drop protection
+
+uint8 mode
+---
+bool success
+string message
+uint8 mode   # mode reported by the robot afterwards

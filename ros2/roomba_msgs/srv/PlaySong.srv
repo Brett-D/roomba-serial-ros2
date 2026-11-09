@@ -1,0 +1,5 @@
+# Opcode 141. Requires Safe or Full mode.
+uint8 song_number   # 0-4
+---
+bool success
+string message

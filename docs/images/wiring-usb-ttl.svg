@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="640" viewBox="0 0 1120 640" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+<rect width="1120" height="640" fill="#ffffff"/>
+<text x="560" y="40" font-size="23" text-anchor="middle" fill="#222" font-weight="bold">Roomba 500-series ⇄ USB-TTL serial adapter (recommended)</text>
+<text x="560" y="64" font-size="13" text-anchor="middle" fill="#444" font-weight="normal">FT232RL-style adapter with its voltage jumper on 5V. Works with any computer: Jetson, Raspberry Pi, laptop.</text>
+<rect x="40" y="100" width="200" height="200" rx="10" fill="#e8f5e9" stroke="#2e7d32" stroke-width="2"/>
+<text x="140.0" y="128" font-size="17" text-anchor="middle" fill="#222" font-weight="bold">Computer</text>
+<text x="140.0" y="147" font-size="12" text-anchor="middle" fill="#444" font-weight="normal">Jetson / Pi / PC</text>
+<rect x="200" y="190" width="40" height="24" fill="#90a4ae" stroke="#455a64" stroke-width="2"/>
+<text x="140" y="207" font-size="13" text-anchor="middle" fill="#455a64" font-weight="bold">USB port</text>
+<text x="140" y="250" font-size="13" text-anchor="middle" fill="#333" font-weight="normal">/dev/ttyUSB0</text>
+<text x="140" y="268" font-size="13" text-anchor="middle" fill="#333" font-weight="normal">115200 8N1</text>
+<rect x="400" y="100" width="250" height="380" rx="10" fill="#e3f0fc" stroke="#1565c0" stroke-width="2"/>
+<text x="525.0" y="128" font-size="17" text-anchor="middle" fill="#222" font-weight="bold">USB-TTL adapter</text>
+<text x="525.0" y="147" font-size="12" text-anchor="middle" fill="#444" font-weight="normal">FT232RL, jumper on 5V</text>
+<rect x="385" y="190" width="30" height="24" fill="#90a4ae" stroke="#455a64" stroke-width="2"/>
+<path d="M240 202 H385" fill="none" stroke="#607d8b" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="312" y="192" font-size="12" text-anchor="middle" fill="#455a64" font-weight="normal">mini-USB cable</text>
+<rect x="430" y="300" width="90" height="70" rx="6" fill="#fff" stroke="#1565c0"/>
+<circle cx="450" cy="325" r="7" fill="#ffd54f" stroke="#795548"/>
+<text x="450" y="352" font-size="11" text-anchor="middle" fill="#333" font-weight="bold">3.3V</text>
+<circle cx="475" cy="325" r="7" fill="#ffd54f" stroke="#795548"/>
+<circle cx="500" cy="325" r="7" fill="#ffd54f" stroke="#795548"/>
+<text x="500" y="352" font-size="11" text-anchor="middle" fill="#333" font-weight="bold">5V</text>
+<rect x="468" y="315" width="40" height="20" rx="3" fill="#222" opacity="0.85"/>
+<text x="475" y="390" font-size="12" text-anchor="middle" fill="#1565c0" font-weight="bold">jumper: middle + 5V</text>
+<rect x="860" y="100" width="220" height="300" rx="10" fill="#f3f3f3" stroke="#424242" stroke-width="2"/>
+<text x="970.0" y="128" font-size="17" text-anchor="middle" fill="#222" font-weight="bold">Roomba 500</text>
+<text x="970.0" y="147" font-size="12" text-anchor="middle" fill="#444" font-weight="normal">7-pin Mini-DIN port</text>
+<text x="635" y="165" font-size="14" text-anchor="end" fill="#222" font-weight="bold">GND</text>
+<circle cx="650" cy="160" r="6" fill="#fff" stroke="#333" stroke-width="2"/>
+<path d="M650 160 H860" fill="none" stroke="#222222" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="755" y="151" font-size="12" text-anchor="middle" fill="#222222" font-weight="bold">GND</text>
+<circle cx="860" cy="160" r="6" fill="#fff" stroke="#333" stroke-width="2"/>
+<text x="875" y="165" font-size="14" text-anchor="start" fill="#222" font-weight="normal">Pin 6 · GND</text>
+<text x="635" y="205" font-size="14" text-anchor="end" fill="#999" font-weight="normal">CTS</text>
+<circle cx="650" cy="200" r="6" fill="#fff" stroke="#bbb" stroke-width="2"/>
+<path d="M650 200 H690" fill="none" stroke="#bbb" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="698" y="205" font-size="12" text-anchor="start" fill="#c62828" font-weight="normal">✕ not connected</text>
+<text x="635" y="245" font-size="14" text-anchor="end" fill="#999" font-weight="normal">VCC</text>
+<circle cx="650" cy="240" r="6" fill="#fff" stroke="#bbb" stroke-width="2"/>
+<path d="M650 240 H690" fill="none" stroke="#bbb" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="698" y="245" font-size="12" text-anchor="start" fill="#c62828" font-weight="normal">✕ not connected</text>
+<text x="635" y="285" font-size="14" text-anchor="end" fill="#222" font-weight="bold">TXD</text>
+<circle cx="650" cy="280" r="6" fill="#fff" stroke="#333" stroke-width="2"/>
+<path d="M650 280 H860" fill="none" stroke="#1e63d6" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="755" y="271" font-size="12" text-anchor="middle" fill="#1e63d6" font-weight="bold">adapter TX ⟶ Roomba RX</text>
+<circle cx="860" cy="280" r="6" fill="#fff" stroke="#333" stroke-width="2"/>
+<text x="875" y="285" font-size="14" text-anchor="start" fill="#222" font-weight="normal">Pin 3 · RXD</text>
+<text x="635" y="325" font-size="14" text-anchor="end" fill="#222" font-weight="bold">RXD</text>
+<circle cx="650" cy="320" r="6" fill="#fff" stroke="#333" stroke-width="2"/>
+<path d="M650 320 H860" fill="none" stroke="#2e9e44" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="755" y="311" font-size="12" text-anchor="middle" fill="#2e9e44" font-weight="bold">adapter RX ⟵ Roomba TX</text>
+<circle cx="860" cy="320" r="6" fill="#fff" stroke="#333" stroke-width="2"/>
+<text x="875" y="325" font-size="14" text-anchor="start" fill="#222" font-weight="normal">Pin 4 · TXD</text>
+<text x="635" y="365" font-size="14" text-anchor="end" fill="#222" font-weight="bold">DTR</text>
+<circle cx="650" cy="360" r="6" fill="#fff" stroke="#333" stroke-width="2"/>
+<path d="M650 360 H860" fill="none" stroke="#8e44ad" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="10 7"/>
+<text x="755" y="351" font-size="12" text-anchor="middle" fill="#8e44ad" font-weight="bold">optional: wake / keep awake</text>
+<circle cx="860" cy="360" r="6" fill="#fff" stroke="#333" stroke-width="2"/>
+<text x="875" y="365" font-size="14" text-anchor="start" fill="#222" font-weight="normal">Pin 5 · BRC</text>
+<rect x="872" y="410" width="196" height="70" rx="6" fill="#ffebee" stroke="#d32f2f" stroke-width="1.5"/>
+<text x="970.0" y="434" font-size="14" text-anchor="middle" fill="#c62828" font-weight="bold">⚠ Pins 1 &amp; 2 = Vpwr</text>
+<text x="970.0" y="452" font-size="12" text-anchor="middle" fill="#c62828" font-weight="normal">raw battery, ~14–17 V</text>
+<text x="970.0" y="470" font-size="13" text-anchor="middle" fill="#c62828" font-weight="bold">DO NOT CONNECT</text>
+<text x="45" y="520" font-size="13" text-anchor="start" fill="#333" font-weight="normal">• TX goes to RX: adapter TXD → Roomba pin 3, adapter RXD ← Roomba pin 4. A common ground is required.</text>
+<text x="45" y="542" font-size="13" text-anchor="start" fill="#333" font-weight="normal">• Leave VCC unconnected: the adapter is powered by USB. Never wire anything to Roomba pins 1 or 2.</text>
+<text x="45" y="564" font-size="13" text-anchor="start" fill="#333" font-weight="normal">• Never use a DB9 / RS-232 "USB serial" adapter: it swings ±12 V and can damage the Roomba (0–5 V TTL).</text>
+<text x="45" y="586" font-size="13" text-anchor="start" fill="#333" font-weight="normal">• DTR → pin 5 is optional. It lets software pulse BRC low to wake the robot and keep it awake in passive mode.</text>
+<text x="45" y="608" font-size="13" text-anchor="start" fill="#333" font-weight="normal">• Pin positions as seen looking into the robot's socket: see mini-din-pinout.svg. Check with a multimeter first.</text>
+</svg>

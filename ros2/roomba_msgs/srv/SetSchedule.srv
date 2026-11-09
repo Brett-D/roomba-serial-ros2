@@ -1,0 +1,15 @@
+# Opcode 167: the robot's built-in cleaning schedule. days = 0 disables it.
+uint8 SUNDAY=1
+uint8 MONDAY=2
+uint8 TUESDAY=4
+uint8 WEDNESDAY=8
+uint8 THURSDAY=16
+uint8 FRIDAY=32
+uint8 SATURDAY=64
+
+uint8 days          # bitmask of the day constants above
+uint8[7] hours      # Sunday first, 0-23
+uint8[7] minutes    # Sunday first, 0-59
+---
+bool success
+string message

@@ -1,0 +1,8 @@
+# Opcode 168: set the robot's clock.
+bool use_system_time   # ignore the fields below and use the Jetson's local time
+uint8 day              # 0 = Sunday ... 6 = Saturday
+uint8 hour             # 0-23
+uint8 minute           # 0-59
+---
+bool success
+string message

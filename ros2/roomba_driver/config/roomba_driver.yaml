@@ -1,0 +1,42 @@
+roomba_driver:
+  ros__parameters:
+    # USB-TTL adapter (jumper on 5V). Prefer the stable by-id path, e.g.
+    #   /dev/serial/by-id/usb-FTDI_FT232R_USB_UART_<serial>-if00-port0   (ls /dev/serial/by-id/)
+    port: /dev/ttyUSB0
+    baud: 115200
+
+    # Mode entered at startup: passive (sensors only), safe (stops on cliff/wheel drop) or full
+    # (NO cliff/wheel-drop protection). Drive/LED/display/song commands need safe or full.
+    initial_mode: safe
+    # If the robot drops to passive (lifted, cliff, on charger), re-enter initial_mode automatically
+    # on the next motion command. Off by default: call roomba/set_mode instead.
+    auto_reenter_mode: false
+
+    # The VSLAM stack on the reference robot already owns odom -> base, so wheel odometry is
+    # published on /wheel/odom without a TF. Set publish_tf: true if nothing else publishes
+    # odom -> base_frame (e.g. wheel-only navigation).
+    odom_frame: odom
+    base_frame: base_link
+    publish_tf: false
+
+    # Roomba 500-series geometry
+    wheel_base_m: 0.235
+    wheel_diameter_m: 0.072
+    encoder_counts_per_rev: 508.8
+
+    # Motion limits and safety
+    max_wheel_speed_m_s: 0.3      # hardware maximum is 0.5
+    cmd_vel_timeout_s: 0.5        # stop if no drive command arrives for this long
+    use_stamped_cmd_vel: false    # true if Nav2 has enable_stamped_cmd_vel: true
+
+    odom_rate_hz: 50.0
+    sensor_rate_hz: 20.0
+    battery_rate_hz: 1.0
+    left_wheel_joint: left_wheel_joint
+    right_wheel_joint: right_wheel_joint
+    display_scroll_period_s: 0.35
+
+    # Only if the adapter's DTR pin is wired to Mini-DIN pin 5 (BRC): wake the robot from sleep
+    # when the stream stalls, and pulse BRC periodically in passive mode so it doesn't fall asleep.
+    wake_with_dtr: false
+    keep_awake_period_s: 60.0
