@@ -65,6 +65,9 @@ class RoombaDriver(Node):
         wake_with_dtr = bool(p('wake_with_dtr', False).value)
         keep_awake_s = float(p('keep_awake_period_s', 60.0).value)
         scroll_period = float(p('display_scroll_period_s', 0.35).value)
+        # Safe mode doesn't stop on bumps; the camera can't see the last ~30 cm, so the bumper
+        # is the last line of defence. Forward motion is refused while a bumper is pressed.
+        self.bump_stop = bool(p('bump_stop', True).value)
 
         self.robot = Roomba(self.port, baud, logger=self.get_logger())
         self.robot.wake_with_dtr = wake_with_dtr
@@ -84,6 +87,8 @@ class RoombaDriver(Node):
         self._last_frame_mono = 0.0
         self._contact_lost = False
         self._driving = False
+        self._driving_forward = False
+        self._bumped = False
         self._last_drive_time = 0.0
         self._last_reenter = 0.0
         self._scroll = None              # [padded text, index]
@@ -185,6 +190,14 @@ class RoombaDriver(Node):
             if mode != self._mode:
                 self._mode_event = (self._mode, mode, dict(self._values))
                 self._mode = mode
+            bumped = bool(self._values.get('bump_left') or self._values.get('bump_right'))
+            newly_bumped = bumped and not self._bumped
+            self._bumped = bumped
+        if newly_bumped and self.bump_stop and self._driving_forward:
+            # Stop straight from the reader thread: waiting for the next timer adds latency.
+            if self._try(self.robot.stop_drive, 'stop on bump'):
+                self._driving = self._driving_forward = False
+            self.get_logger().warning('bumper hit: stopped (reverse or turn to get free)')
 
     def _supervise(self):
         """Contact loss, mode changes, initial mode, and the drive command watchdog."""
@@ -200,7 +213,7 @@ class RoombaDriver(Node):
             have_data = self._mode is not None
         if lost:
             if self._try(self.robot.stop_drive, 'stop after losing contact'):
-                self._driving = False
+                self._driving = self._driving_forward = False
             self._contact_lost = True
             self.pub_mode.publish(String(data='unknown'))
             self.get_logger().warning(
@@ -224,7 +237,7 @@ class RoombaDriver(Node):
         if self._driving and now - self._last_drive_time > self.cmd_timeout:
             # Keep retrying every cycle until a stop actually reaches the robot.
             if self._try(self.robot.stop_drive, 'stop after command timeout'):
-                self._driving = False
+                self._driving = self._driving_forward = False
                 self.get_logger().info('no drive command for %.1f s; stopped' % self.cmd_timeout)
 
     def _report_mode_change(self, previous, mode, values):
@@ -242,7 +255,7 @@ class RoombaDriver(Node):
         if previous in CONTROL_MODES and mode == oi.MODE_PASSIVE:
             blockers = self._blockers(values)
             reason = f' ({blockers})' if blockers else ''
-            self._driving = False
+            self._driving = self._driving_forward = False
         self.get_logger().info(f'OI mode {oi.MODE_NAMES.get(previous, previous)} -> {name}{reason}')
 
     @staticmethod
@@ -285,16 +298,23 @@ class RoombaDriver(Node):
                 f'Call roomba/set_mode with mode 2 (safe) or 3 (full).', throttle_duration_sec=5.0)
         return False
 
-    def _drive(self, action, moving, what):
+    def _drive(self, action, moving, what, forward=False):
         if not moving:
             # Stopping is always allowed, even if the mode is unknown.
             if self.robot.is_open and self._try(action, what):
-                self._driving = False
+                self._driving = self._driving_forward = False
+            return
+        if forward and self.bump_stop and self._bumped:
+            self.get_logger().warning(f'ignoring forward {what}: bumper pressed (reverse or turn to get free)',
+                                      throttle_duration_sec=2.0)
+            if self._driving_forward and self._try(self.robot.stop_drive, 'stop on bump'):
+                self._driving = self._driving_forward = False
             return
         if not self._in_control(what):
             return
         if self._try(action, what):
             self._driving = True
+            self._driving_forward = forward
             self._last_drive_time = time.monotonic()
 
     def _service_result(self, response, action, what, need_control=False):
@@ -315,22 +335,27 @@ class RoombaDriver(Node):
         left, right = twist_to_wheel_speeds(msg.linear.x, msg.angular.z, self.wheel_base,
                                             self.max_wheel_speed)
         left_mm, right_mm = round(left * 1000), round(right * 1000)
-        self._drive(lambda: self.robot.drive_direct(left_mm, right_mm), bool(left_mm or right_mm), 'cmd_vel')
+        self._drive(lambda: self.robot.drive_direct(left_mm, right_mm), bool(left_mm or right_mm), 'cmd_vel',
+                    forward=left_mm + right_mm > 0)
 
     def _on_drive(self, msg):
         limit = self.max_wheel_speed * 1000
         velocity = max(-limit, min(limit, msg.velocity_mm_s))
-        self._drive(lambda: self.robot.drive(velocity, msg.radius_mm), bool(velocity), 'roomba/drive')
+        spin = msg.radius_mm in (oi.RADIUS_TURN_CW, oi.RADIUS_TURN_CCW)
+        self._drive(lambda: self.robot.drive(velocity, msg.radius_mm), bool(velocity), 'roomba/drive',
+                    forward=velocity > 0 and not spin)
 
     def _on_drive_direct(self, msg):
         limit = self.max_wheel_speed * 1000
         left = max(-limit, min(limit, msg.left_mm_s))
         right = max(-limit, min(limit, msg.right_mm_s))
-        self._drive(lambda: self.robot.drive_direct(left, right), bool(left or right), 'roomba/drive_direct')
+        self._drive(lambda: self.robot.drive_direct(left, right), bool(left or right), 'roomba/drive_direct',
+                    forward=left + right > 0)
 
     def _on_drive_pwm(self, msg):
         self._drive(lambda: self.robot.drive_pwm(msg.left_pwm, msg.right_pwm),
-                    bool(msg.left_pwm or msg.right_pwm), 'roomba/drive_pwm')
+                    bool(msg.left_pwm or msg.right_pwm), 'roomba/drive_pwm',
+                    forward=msg.left_pwm + msg.right_pwm > 0)
 
     # ------------------------------------------------------------ other actuator topics
     def _on_cleaning_motors(self, msg):
@@ -513,7 +538,7 @@ class RoombaDriver(Node):
 
     def _publish_sensors(self):
         with self._lock:
-            if self._latest is None:
+            if self._latest is None or self._mode is None:   # never publish stale data
                 return
             values, stamp = dict(self._latest[0]), self._latest[1]
         msg = SensorState()
@@ -525,7 +550,7 @@ class RoombaDriver(Node):
 
     def _publish_battery(self):
         with self._lock:
-            if self._latest is None:
+            if self._latest is None or self._mode is None:
                 return
             v, stamp = dict(self._latest[0]), self._latest[1]
         msg = BatteryState()
