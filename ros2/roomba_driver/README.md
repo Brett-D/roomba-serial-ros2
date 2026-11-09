@@ -125,6 +125,8 @@ See `config/roomba_driver.yaml`. Important ones:
 | `max_wheel_speed_m_s` | 0.3 | Per-wheel speed limit (hardware maximum 0.5). |
 | `cmd_vel_timeout_s` | 0.5 | Stop the wheels if no drive command arrives for this long. |
 | `bump_stop` | true | Stop when a bumper is pressed while driving forward, and refuse forward commands until it's released. Reversing and turning in place still work, so Nav2's back-up recovery can get free. |
+| `bump_stop_light_bumper` | false | Also treat the front light-bumper (IR proximity) detections as bumps, so the robot stops a few centimetres before touching. |
+| `ignore_sensors` | [''] | Sensors to report as off everywhere, for a faulty unit, e.g. `['bump_right']` for a stuck bumper switch. |
 | `wheel_base_m`, `wheel_diameter_m`, `encoder_counts_per_rev` | 0.235, 0.072, 508.8 | Odometry geometry. |
 | `wake_with_dtr`, `keep_awake_period_s` | false, 60 | Wake the robot, and keep it awake in passive, with 1 s low pulses on BRC through DTR. Pulses of 50–500 ms would change the robot's baud rate. |
 

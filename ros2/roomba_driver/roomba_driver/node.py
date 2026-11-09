@@ -30,6 +30,9 @@ from roomba_driver.roomba import Roomba, RoombaError
 MODES = {'off': oi.MODE_OFF, 'passive': oi.MODE_PASSIVE, 'safe': oi.MODE_SAFE, 'full': oi.MODE_FULL}
 CONTROL_MODES = (oi.MODE_SAFE, oi.MODE_FULL)
 STALE_AFTER_S = 1.0  # sensor data older than this means contact with the robot is lost
+BUMP_FIELDS = ('bump_left', 'bump_right')
+LIGHT_BUMP_FIELDS = ('light_bump_front_left', 'light_bump_center_left', 'light_bump_center_right',
+                     'light_bump_front_right')
 
 
 def _yaw_to_quaternion(yaw):
@@ -68,6 +71,13 @@ class RoombaDriver(Node):
         # Safe mode doesn't stop on bumps; the camera can't see the last ~30 cm, so the bumper
         # is the last line of defence. Forward motion is refused while a bumper is pressed.
         self.bump_stop = bool(p('bump_stop', True).value)
+        # Also treat the front light-bumper (IR proximity) detections as bumps.
+        self.bump_stop_light = bool(p('bump_stop_light_bumper', False).value)
+        # Faulty sensors to report as off everywhere (topics and safety logic), e.g. ['bump_right'].
+        self.ignore_sensors = [s for s in p('ignore_sensors', ['']).value if s]
+        unknown = set(self.ignore_sensors) - set(SensorState.get_fields_and_field_types())
+        if unknown:
+            raise ValueError(f'ignore_sensors: unknown sensor names {sorted(unknown)}')
 
         self.robot = Roomba(self.port, baud, logger=self.get_logger())
         self.robot.wake_with_dtr = wake_with_dtr
@@ -181,6 +191,9 @@ class RoombaDriver(Node):
         stamp = self.get_clock().now()
         with self._lock:
             self._values.update(values)   # frames alternate between two layouts; keep the union
+            for name in self.ignore_sensors:
+                if name in self._values:
+                    self._values[name] = type(self._values[name])()   # False / 0
             self._latest = (self._values, stamp)
             self._last_frame_mono = monotonic
             if self.odom.update(values['left_encoder_counts'], values['right_encoder_counts'],
@@ -190,7 +203,7 @@ class RoombaDriver(Node):
             if mode != self._mode:
                 self._mode_event = (self._mode, mode, dict(self._values))
                 self._mode = mode
-            bumped = bool(self._values.get('bump_left') or self._values.get('bump_right'))
+            bumped = any(self._values.get(k) for k in BUMP_FIELDS + (LIGHT_BUMP_FIELDS if self.bump_stop_light else ()))
             newly_bumped = bumped and not self._bumped
             self._bumped = bumped
         if newly_bumped and self.bump_stop and self._driving_forward:

@@ -28,6 +28,8 @@ roomba_driver:
     max_wheel_speed_m_s: 0.3      # hardware maximum is 0.5
     cmd_vel_timeout_s: 0.5        # stop if no drive command arrives for this long
     bump_stop: true               # refuse forward motion while a bumper is pressed
+    bump_stop_light_bumper: false # also stop on the front light-bumper (IR proximity) detections
+    ignore_sensors: ['']          # faulty sensors to report as off, e.g. ['bump_right']
     use_stamped_cmd_vel: false    # true if Nav2 has enable_stamped_cmd_vel: true
 
     odom_rate_hz: 50.0
