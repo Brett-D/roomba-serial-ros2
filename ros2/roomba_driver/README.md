@@ -126,6 +126,7 @@ See `config/roomba_driver.yaml`. Important ones:
 | `cmd_vel_timeout_s` | 0.5 | Stop the wheels if no drive command arrives for this long. |
 | `bump_stop` | true | Stop when a bumper is pressed while driving forward, and refuse forward commands until it's released. Reversing and turning in place still work, so Nav2's back-up recovery can get free. |
 | `bump_stop_light_bumper` | false | Also treat the front light-bumper (IR proximity) detections as bumps, so the robot stops a few centimetres before touching. |
+| `light_bumper_stop_signal` | 0 | With `bump_stop_light_bumper`: 0 uses the Roomba's own light-bumper flags; a value above 0 counts a light bumper only when its signal (0–4095) reaches it. Deep carpet pile can set the flags (front-left signal ~170 on one robot, versus ~235 for an object 1–2 cm away), which blocks all forward driving; a threshold such as 200 avoids that. |
 | `ignore_sensors` | [''] | Sensors to report as off everywhere, for a faulty unit, e.g. `['bump_right']` for a stuck bumper switch. |
 | `wheel_base_m`, `wheel_diameter_m`, `encoder_counts_per_rev` | 0.235, 0.072, 508.8 | Odometry geometry. |
 | `wake_with_dtr`, `keep_awake_period_s` | false, 60 | Wake the robot, and keep it awake in passive, with 1 s low pulses on BRC through DTR. Pulses of 50–500 ms would change the robot's baud rate. |

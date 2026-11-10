@@ -73,6 +73,9 @@ class RoombaDriver(Node):
         self.bump_stop = bool(p('bump_stop', True).value)
         # Also treat the front light-bumper (IR proximity) detections as bumps.
         self.bump_stop_light = bool(p('bump_stop_light_bumper', False).value)
+        # 0: use the Roomba's own light-bumper flags. >0: a light bumper counts only when its
+        # signal (0-4095) reaches this, e.g. so deep carpet pile (~100-200) doesn't block driving.
+        self.light_stop_signal = int(p('light_bumper_stop_signal', 0).value)
         # Faulty sensors to report as off everywhere (topics and safety logic), e.g. ['bump_right'].
         self.ignore_sensors = [s for s in p('ignore_sensors', ['']).value if s]
         unknown = set(self.ignore_sensors) - set(SensorState.get_fields_and_field_types())
@@ -203,7 +206,8 @@ class RoombaDriver(Node):
             if mode != self._mode:
                 self._mode_event = (self._mode, mode, dict(self._values))
                 self._mode = mode
-            bumped = any(self._values.get(k) for k in BUMP_FIELDS + (LIGHT_BUMP_FIELDS if self.bump_stop_light else ()))
+            bumped = any(self._values.get(k) for k in BUMP_FIELDS) or (
+                self.bump_stop_light and any(self._light_bumped(k) for k in LIGHT_BUMP_FIELDS))
             newly_bumped = bumped and not self._bumped
             self._bumped = bumped
         if newly_bumped and self.bump_stop and self._driving_forward:
@@ -211,6 +215,12 @@ class RoombaDriver(Node):
             if self._try(self.robot.stop_drive, 'stop on bump'):
                 self._driving = self._driving_forward = False
             self.get_logger().warning('bumper hit: stopped (reverse or turn to get free)')
+
+    def _light_bumped(self, field):
+        """A light bumper counts as a bump (its flag, or its signal when a threshold is set)."""
+        if self.light_stop_signal > 0:
+            return self._values.get(field + '_signal', 0) >= self.light_stop_signal
+        return bool(self._values.get(field))
 
     def _supervise(self):
         """Contact loss, mode changes, initial mode, and the drive command watchdog."""
