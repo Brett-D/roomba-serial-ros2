@@ -6,6 +6,7 @@
     python3 roomba_cli.py display HELLO           # scrolls text longer than 4 characters
     python3 roomba_cli.py drive 100 0.5           # 100 mm/s for 0.5 s, then report encoder distance
     python3 roomba_cli.py stop                    # wheels + cleaning motors off, back to passive
+    python3 roomba_cli.py charge 300              # log the charging chain every second for 5 min
     python3 roomba_cli.py --port /dev/ttyUSB1 sensors
 
 The robot must be awake (press Clean if its lights are off). Commands that act on the robot need
@@ -101,6 +102,20 @@ def cmd_stop(robot, _args):
     robot.pwm_motors(0, 0, 0)
 
 
+def cmd_charge(robot, args):
+    """Log the charging chain once a second (passive mode; the Roomba only charges in passive)."""
+    print('  time   volts      mA   temp    mAh/capacity   state            charger seen')
+    t0 = time.monotonic()
+    while time.monotonic() - t0 < args.seconds:
+        v = robot.sensors(100)
+        src = [n for n, k in (('dock', 'home_base_available'), ('jack', 'internal_charger_available')) if v[k]]
+        print(f"{time.monotonic() - t0:6.0f}  {v['voltage_mv'] / 1000:6.2f}  {v['current_ma']:6d}  "
+              f"{v['temperature_c']:4d} C  {v['charge_mah']:5d}/{v['capacity_mah']:5d}   "
+              f"{oi.CHARGING_STATES.get(v['charging_state'], v['charging_state']):16s} {','.join(src) or 'none'}",
+              flush=True)
+        time.sleep(1.0)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--port', default='/dev/ttyUSB0')
@@ -117,6 +132,9 @@ def main():
     p.add_argument('seconds', type=float, help='0-3 s')
     p.set_defaults(func=cmd_drive)
     sub.add_parser('stop').set_defaults(func=cmd_stop)
+    p = sub.add_parser('charge', help='log battery voltage/current/temperature and charger state every second')
+    p.add_argument('seconds', type=float, nargs='?', default=120.0)
+    p.set_defaults(func=cmd_charge)
     args = parser.parse_args()
 
     try:
