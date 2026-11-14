@@ -24,6 +24,7 @@ from roomba_msgs.msg import (CleaningMotors, Drive, DriveDirect, DrivePwm, Leds,
 from roomba_msgs.srv import DefineSong, PlaySong, PressButtons, SetDayTime, SetMode, SetSchedule
 
 from roomba_driver import oi
+from roomba_driver.battery import li_ion_fraction
 from roomba_driver.kinematics import DiffDriveOdometry, twist_to_wheel_speeds
 from roomba_driver.roomba import Roomba, RoombaError
 
@@ -63,6 +64,18 @@ class RoombaDriver(Node):
         odom_rate = float(p('odom_rate_hz', 50.0).value)
         sensor_rate = float(p('sensor_rate_hz', 20.0).value)
         battery_rate = float(p('battery_rate_hz', 1.0).value)
+        # Charge estimate. 'roomba': the robot's own coulomb counter (stock battery). 'voltage': the
+        # pack voltage through a Li-ion discharge curve, for another pack wired to the battery
+        # contacts (e.g. a power-tool battery), where the robot's mAh and temperature are made up.
+        self.battery_gauge = str(p('battery_gauge', 'roomba').value).lower()
+        if self.battery_gauge not in ('roomba', 'voltage'):
+            raise ValueError(f"battery_gauge must be roomba or voltage, not '{self.battery_gauge}'")
+        self.battery_cells = int(p('battery_cells', 5).value)
+        self.battery_capacity_ah = float(p('battery_capacity_ah', 0.0).value)
+        self.battery_resistance = float(p('battery_internal_resistance_ohm', 0.1).value)
+        smoothing_s = float(p('battery_smoothing_s', 30.0).value)
+        self._ocv_alpha = 1.0 - math.exp(-1.0 / max(battery_rate * smoothing_s, 1e-3))
+        self._ocv = None
         self.joint_names = [p('left_wheel_joint', 'left_wheel_joint').value,
                             p('right_wheel_joint', 'right_wheel_joint').value]
         wake_with_dtr = bool(p('wake_with_dtr', False).value)
@@ -664,11 +677,22 @@ class RoombaDriver(Node):
         msg.voltage = v['voltage_mv'] / 1000.0
         msg.current = v['current_ma'] / 1000.0
         msg.temperature = float(v['temperature_c'])
-        msg.charge = v['charge_mah'] / 1000.0
-        msg.capacity = v['capacity_mah'] / 1000.0
-        msg.design_capacity = float('nan')
-        msg.percentage = (min(1.0, v['charge_mah'] / v['capacity_mah']) if v['capacity_mah']
-                          else float('nan'))
+        if self.battery_gauge == 'voltage':
+            # current is negative while discharging: add back the sag across the pack resistance,
+            # then smooth so motor load doesn't swing the gauge.
+            ocv = msg.voltage - msg.current * self.battery_resistance
+            self._ocv = ocv if self._ocv is None else self._ocv + self._ocv_alpha * (ocv - self._ocv)
+            msg.percentage = li_ion_fraction(self._ocv / self.battery_cells)
+            msg.temperature = float('nan')
+            msg.capacity = msg.design_capacity = (self.battery_capacity_ah
+                                                  if self.battery_capacity_ah > 0 else float('nan'))
+            msg.charge = msg.percentage * msg.capacity
+        else:
+            msg.charge = v['charge_mah'] / 1000.0
+            msg.capacity = v['capacity_mah'] / 1000.0
+            msg.design_capacity = float('nan')
+            msg.percentage = (min(1.0, v['charge_mah'] / v['capacity_mah']) if v['capacity_mah']
+                              else float('nan'))
         state = v['charging_state']
         on_charger = v['home_base_available'] or v['internal_charger_available']
         if state in (1, 2, 3):
@@ -681,7 +705,9 @@ class RoombaDriver(Node):
             msg.power_supply_status = BatteryState.POWER_SUPPLY_STATUS_DISCHARGING
         msg.power_supply_health = (BatteryState.POWER_SUPPLY_HEALTH_UNSPEC_FAILURE if state == 5
                                    else BatteryState.POWER_SUPPLY_HEALTH_GOOD)
-        msg.power_supply_technology = BatteryState.POWER_SUPPLY_TECHNOLOGY_NIMH
+        msg.power_supply_technology = (BatteryState.POWER_SUPPLY_TECHNOLOGY_LION
+                                       if self.battery_gauge == 'voltage'
+                                       else BatteryState.POWER_SUPPLY_TECHNOLOGY_NIMH)
         msg.present = True
         self.pub_battery.publish(msg)
 

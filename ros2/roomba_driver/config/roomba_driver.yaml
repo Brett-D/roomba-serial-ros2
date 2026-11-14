@@ -40,6 +40,14 @@ roomba_driver:
     right_wheel_joint: right_wheel_joint
     display_scroll_period_s: 0.35
 
+    # Charge estimate: roomba = the robot's coulomb counter (stock battery); voltage = pack voltage
+    # through a Li-ion curve, for another pack on the battery contacts (the robot's mAh are made up).
+    battery_gauge: roomba
+    battery_cells: 5                      # voltage gauge: Li-ion cells in series
+    battery_capacity_ah: 0.0              # voltage gauge: pack capacity for charge/capacity, 0 = unknown
+    battery_internal_resistance_ohm: 0.1  # voltage gauge: corrects the voltage sag under load
+    battery_smoothing_s: 30.0             # voltage gauge: time constant of the voltage filter
+
     # Only if the adapter's DTR pin is wired to Mini-DIN pin 5 (BRC): wake the robot from sleep
     # when the stream stalls, and pulse BRC periodically in passive mode so it doesn't fall asleep.
     wake_with_dtr: false
