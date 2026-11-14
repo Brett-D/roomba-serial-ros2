@@ -76,6 +76,13 @@ class RoombaDriver(Node):
         # 0: use the Roomba's own light-bumper flags. >0: a light bumper counts only when its
         # signal (0-4095) reaches this, e.g. so deep carpet pile (~100-200) doesn't block driving.
         self.light_stop_signal = int(p('light_bumper_stop_signal', 0).value)
+        # Reflex after a bump while driving forward: reverse a little, then turn away from the
+        # side that was hit, ignoring drive commands until done (at most ~2 s). Without it the
+        # robot just stops and a planner that keeps pushing forward stays stuck at the obstacle.
+        self.bump_backup = bool(p('bump_backup', False).value)
+        self.backup_distance = float(p('bump_backup_distance_m', 0.08).value)
+        self.backup_speed = abs(float(p('bump_backup_speed_m_s', 0.1).value))
+        self.backup_turn = abs(float(p('bump_backup_turn_rad', 0.4).value))
         # Faulty sensors to report as off everywhere (topics and safety logic), e.g. ['bump_right'].
         self.ignore_sensors = [s for s in p('ignore_sensors', ['']).value if s]
         unknown = set(self.ignore_sensors) - set(SensorState.get_fields_and_field_types())
@@ -102,6 +109,10 @@ class RoombaDriver(Node):
         self._driving = False
         self._driving_forward = False
         self._bumped = False
+        self._bump_side = 0             # +1 hit on the left, -1 on the right
+        self._backup = None              # [(left_mm_s, right_mm_s, end monotonic), ...]
+        self._backup_request = 0         # side of a bump waiting for the backup reflex
+        self._backup_times = []          # monotonic starts of recent reflexes (rate limit)
         self._last_drive_time = 0.0
         self._last_reenter = 0.0
         self._scroll = None              # [padded text, index]
@@ -210,11 +221,32 @@ class RoombaDriver(Node):
                 self.bump_stop_light and any(self._light_bumped(k) for k in LIGHT_BUMP_FIELDS))
             newly_bumped = bumped and not self._bumped
             self._bumped = bumped
-        if newly_bumped and self.bump_stop and self._driving_forward:
+            if newly_bumped:
+                left = bool(self._values.get('bump_left')) or (self.bump_stop_light and any(
+                    self._light_bumped(k) for k in LIGHT_BUMP_FIELDS[:2]))
+                right = bool(self._values.get('bump_right')) or (self.bump_stop_light and any(
+                    self._light_bumped(k) for k in LIGHT_BUMP_FIELDS[2:]))
+                self._bump_side = 1 if left and not right else -1 if right and not left else 0
+        if newly_bumped and self.bump_stop and (self._driving_forward or (
+                self._driving and self.bump_backup and self._backup is None)):
             # Stop straight from the reader thread: waiting for the next timer adds latency.
             if self._try(self.robot.stop_drive, 'stop on bump'):
                 self._driving = self._driving_forward = False
-            self.get_logger().warning('bumper hit: stopped (reverse or turn to get free)')
+            if self._request_backup(monotonic):
+                self.get_logger().warning('bumper hit: backing up')
+            else:
+                self.get_logger().warning('bumper hit: stopped (reverse or turn to get free)')
+
+    def _request_backup(self, now):
+        """Queue the bump reflex unless it is off, running, or has fired too often lately."""
+        if not self.bump_backup or self._backup is not None or self._backup_request:
+            return False
+        self._backup_times = [t for t in self._backup_times if now - t < 30.0]
+        if len(self._backup_times) >= 4 or (self._backup_times and now - self._backup_times[-1] < 3.0):
+            return False      # still pressed after several tries (stuck sensor, wedged): just stop
+        self._backup_times.append(now)
+        self._backup_request = self._bump_side or 1
+        return True
 
     def _light_bumped(self, field):
         """A light bumper counts as a bump (its flag, or its signal when a threshold is set)."""
@@ -222,9 +254,46 @@ class RoombaDriver(Node):
             return self._values.get(field + '_signal', 0) >= self.light_stop_signal
         return bool(self._values.get(field))
 
+    def _start_backup(self, side, now):
+        """Plan the bump reflex: reverse, then turn away from the side that was hit."""
+        v = round(self.backup_speed * 1000)
+        reverse_s = self.backup_distance / self.backup_speed if self.backup_speed else 0.0
+        turn_s = self.backup_turn * self.wheel_base / 2 / self.backup_speed if self.backup_speed else 0.0
+        # Hit on the left -> turn right (clockwise): left wheel forward, right wheel back.
+        turn = (v, -v) if side > 0 else (-v, v)
+        self._backup = [(-v, -v, now + min(reverse_s, 1.5)),
+                        (turn[0], turn[1], now + min(reverse_s, 1.5) + min(turn_s, 1.0))]
+
+    def _run_backup(self, now):
+        """Advance the bump reflex; returns True while it is in control of the wheels."""
+        if self._backup_request and self._backup is None:
+            side, self._backup_request = self._backup_request, 0
+            if self._mode in CONTROL_MODES:
+                self._start_backup(side, now)
+        if self._backup is None:
+            return False
+        if self._mode not in CONTROL_MODES:   # cliff / wheel drop: the firmware already stopped it
+            self._backup = None
+            return False
+        while self._backup and now >= self._backup[0][2]:
+            self._backup.pop(0)
+        if not self._backup:
+            self._backup = None
+            if self._try(self.robot.stop_drive, 'end of bump backup'):
+                self._driving = self._driving_forward = False
+            self.get_logger().info('bump backup done')
+            return False
+        left, right, _ = self._backup[0]
+        if self._try(lambda: self.robot.drive_direct(left, right), 'bump backup'):
+            self._driving, self._driving_forward = True, False
+            self._last_drive_time = now
+        return True
+
     def _supervise(self):
         """Contact loss, mode changes, initial mode, and the drive command watchdog."""
         now = time.monotonic()
+        if self._run_backup(now):
+            return
         with self._lock:
             if self._mode is not None and now - self._last_frame_mono > STALE_AFTER_S:
                 self._mode = None
@@ -327,12 +396,18 @@ class RoombaDriver(Node):
         return False
 
     def _drive(self, action, moving, what, forward=False):
+        if self._backup is not None or self._backup_request:
+            self.get_logger().info(f'ignoring {what} during the bump backup', throttle_duration_sec=2.0)
+            return
         if not moving:
             # Stopping is always allowed, even if the mode is unknown.
             if self.robot.is_open and self._try(action, what):
                 self._driving = self._driving_forward = False
             return
         if forward and self.bump_stop and self._bumped:
+            if self._request_backup(time.monotonic()):
+                self.get_logger().warning(f'forward {what} while the bumper is pressed: backing up')
+                return
             self.get_logger().warning(f'ignoring forward {what}: bumper pressed (reverse or turn to get free)',
                                       throttle_duration_sec=2.0)
             if self._driving_forward and self._try(self.robot.stop_drive, 'stop on bump'):
