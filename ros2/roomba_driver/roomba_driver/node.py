@@ -92,6 +92,9 @@ class RoombaDriver(Node):
         wake_with_dtr = bool(p('wake_with_dtr', False).value)
         keep_awake_s = float(p('keep_awake_period_s', 60.0).value)
         scroll_period = float(p('display_scroll_period_s', 0.35).value)
+        # Sensor stream layouts (oi.py): v2 has the light-bumper signals in every 15 ms frame;
+        # legacy is the older set proven on the robot, where they come only ~5 times a second.
+        self.stream_layouts = oi.stream_layouts(str(p('stream_layout', 'v2').value).lower())
         # Safe mode doesn't stop on bumps; the camera can't see the last ~30 cm, so the bumper
         # is the last line of defence. Forward motion is refused while a bumper is pressed.
         self.bump_stop = bool(p('bump_stop', True).value)
@@ -208,7 +211,8 @@ class RoombaDriver(Node):
             self.robot.open()
             self.robot.start()
             time.sleep(0.05)
-            self.robot.start_stream()   # primary + secondary layouts, every sensor
+            primary, secondary = self.stream_layouts
+            self.robot.start_stream(primary, secondary_ids=secondary)   # every sensor between them
         except (OSError, RoombaError) as e:
             self.get_logger().warning(f'cannot open {self.port}: {e}; retrying',
                                       throttle_duration_sec=30.0)

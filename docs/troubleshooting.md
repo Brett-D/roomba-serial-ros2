@@ -16,7 +16,7 @@ FT232RL USB-TTL adapter.
 | Sensor values jump around, wrong bits | Marginal receive levels (3.3 V input, divider) | Use a 5 V USB-TTL adapter. |
 | Display text stays after the program ends | The digit LEDs latch | Send `164` with four spaces before returning to passive. |
 | Firmware distance/angle (packets 19/20) say −6 mm after a 50 mm move | Known-flaky packets on 500 firmware | Use encoder counts (43/44). They're accurate and count down in reverse. |
-| ~10% bad stream frames in Safe mode | 84-byte frames (group 100) are too big for the firmware in Safe mode | Keep frames ≤ ~70 bytes. The driver rotates two smaller layouts. |
+| ~10% bad stream frames in Safe mode | 84-byte frames (group 100) are too big for the firmware in Safe mode | Keep frames ≤ ~70 bytes. The driver rotates two smaller layouts; `stream_layout: legacy` selects the older, proven pair if the default one misbehaves on a robot. |
 | `/dev/ttyTHS1` won't open: `Failed to enable FIFO mode: -110` | A baud rate ≤ 1200 wedged the Tegra UART | Reboot the Jetson, and avoid very low baud rates. |
 | Wires fell out while the robot drove | Jumper wires pushed into the Mini-DIN socket | Use a 7-pin Mini-DIN plug or cable, or tape/glue the wires in place. |
 

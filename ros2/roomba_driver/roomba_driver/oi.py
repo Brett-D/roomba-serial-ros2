@@ -205,9 +205,24 @@ def stream_payload_length(ids):
 # in the remaining sensors (with the safety, mode and odometry packets) in a 46-byte frame a few
 # times a second. The primary set carries everything the driver acts on: bumps, wheel drops,
 # cliffs, the light bumpers with their signals (light_bumper_stop_signal is checked every frame),
-# the charger and the battery.
+# the charger and the battery. This is stream_layout v2, the default.
 STREAM_PRIMARY = [0, 4, 35, 43, 44, 45, 106, 58]
 STREAM_SECONDARY = [7, 9, 10, 11, 12, 5, 43, 44, 52, 53, 107]
+# The layouts before v2 (same 70/46-byte frames, proven clean on a Roomba 550): the light-bump
+# signals come only in the secondary frame, so light_bumper_stop_signal is checked ~5 times a second.
+STREAM_PRIMARY_LEGACY = [6, 43, 44, 45, 54, 55]
+STREAM_SECONDARY_LEGACY = [7, 9, 10, 11, 12, 35, 43, 44, 106, 52, 53, 56, 57, 58]
+STREAM_LAYOUTS = {'v2': (STREAM_PRIMARY, STREAM_SECONDARY),
+                  'legacy': (STREAM_PRIMARY_LEGACY, STREAM_SECONDARY_LEGACY)}
+
+
+def stream_layouts(name):
+    """(primary, secondary) stream layouts for the driver's stream_layout parameter."""
+    if name not in STREAM_LAYOUTS:
+        raise ValueError(f"stream_layout must be v2 or legacy, not '{name}'")
+    return STREAM_LAYOUTS[name]
+
+
 MAX_STREAM_FRAME = 172   # bytes that fit in 15 ms at 115200 baud
 
 

@@ -48,6 +48,10 @@ roomba_driver:
     battery_internal_resistance_ohm: 0.1  # voltage gauge: corrects the voltage sag under load
     battery_smoothing_s: 30.0             # voltage gauge: time constant of the voltage filter
 
+    # Sensor stream layouts (frames of 70 and 46 bytes either way). v2: the light-bumper signals
+    # come in every 15 ms frame, so a light_bumper_stop_signal stop reacts within ~30 ms. legacy:
+    # the older layouts proven on a Roomba 550; those signals come only ~5 times a second.
+    stream_layout: v2
     # Only if the adapter's DTR pin is wired to Mini-DIN pin 5 (BRC): wake the robot from sleep
     # when the stream stalls, and pulse BRC periodically in passive mode so it doesn't fall asleep.
     wake_with_dtr: false

@@ -75,18 +75,31 @@ def test_stream_parser_accepts_alternating_layouts():
     assert frames[1][1] == {'oi_mode': 2, 'stasis': True}
 
 
-def test_driver_stream_layouts_cover_every_sensor_and_fit():
+@pytest.mark.parametrize('name', sorted(oi.STREAM_LAYOUTS))
+def test_driver_stream_layouts_cover_every_sensor_and_fit(name):
+    primary, secondary = oi.stream_layouts(name)
     covered = set()
-    for layout in (oi.STREAM_PRIMARY, oi.STREAM_SECONDARY):
+    for layout in (primary, secondary):
         assert oi.stream_payload_length(layout) + 3 <= 70   # largest frames proven clean in Safe mode
         for pid in layout:
             covered.update(oi.packet_ids(pid))
         ids = {i for pid in layout for i in oi.packet_ids(pid)}
         assert {7, 9, 10, 11, 12, 35, 43, 44} <= ids   # safety + odometry in every frame
     assert covered == set(oi.GROUPS[100])
-    assert oi.stream_payload_length(oi.STREAM_PRIMARY) != oi.stream_payload_length(oi.STREAM_SECONDARY)
-    # The light-bumper stop (flags, front signals) is checked on every primary frame, not ~5 times a second.
+    assert oi.stream_payload_length(primary) != oi.stream_payload_length(secondary)
+
+
+def test_v2_checks_the_light_bumper_stop_on_every_primary_frame():
     assert {45, 47, 48, 49, 50} <= {i for pid in oi.STREAM_PRIMARY for i in oi.packet_ids(pid)}
+
+
+def test_legacy_stream_layouts_are_the_proven_ones_byte_for_byte():
+    primary, secondary = oi.stream_layouts('legacy')
+    assert oi.stream(primary) == bytes([148, 6, 6, 43, 44, 45, 54, 55])
+    assert oi.stream(secondary) == bytes([148, 14, 7, 9, 10, 11, 12, 35, 43, 44, 106, 52, 53, 56, 57, 58])
+    assert oi.stream_layouts('v2') == (oi.STREAM_PRIMARY, oi.STREAM_SECONDARY)
+    with pytest.raises(ValueError, match="stream_layout must be v2 or legacy, not 'v3'"):
+        oi.stream_layouts('v3')
 
 
 def test_drive_direct_sends_right_wheel_first_and_clamps():

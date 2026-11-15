@@ -85,9 +85,10 @@ driver. Polling and baud changes are also available in the Python library. Strea
 in one 84-byte frame produces bad checksums in Safe mode, so the driver streams a 70-byte primary
 set every 15 ms and swaps in the remaining sensors about 5 times a second. Every frame includes
 bumps, cliffs, mode and encoders; the primary set also has the light bumpers with their signals,
-the charger and the battery, so the bump stops are checked on every 15 ms frame. A drop out of Safe
-mode first seen in the other set waits for the next primary frame (~15 ms) to tell a charger from
-an OI restart.
+the charger and the battery, so the bump stops are checked on every 15 ms frame (with
+`stream_layout: legacy`, the older layouts, the light-bumper signals come only in the other set).
+A drop out of Safe mode first seen in the other set waits for the next primary frame (~15 ms) to
+tell a charger from an OI restart.
 
 ## Examples
 
@@ -130,6 +131,7 @@ See `config/roomba_driver.yaml`. Important ones:
 | `bump_stop` | true | Stop when a bumper is pressed while driving forward, and refuse forward commands until it's released. Reversing and turning in place still work, so Nav2's back-up recovery can get free. |
 | `bump_stop_light_bumper` | false | Also treat the front light-bumper (IR proximity) detections as bumps, so the robot stops a few centimetres before touching. |
 | `light_bumper_stop_signal` | 0 | With `bump_stop_light_bumper`: 0 uses the Roomba's own light-bumper flags; a value above 0 counts a light bumper only when its signal (0–4095) reaches it. Deep carpet pile can set the flags (front-left signal ~170 on one robot, versus ~235 for an object 1–2 cm away), which blocks all forward driving; a threshold such as 200 avoids that. |
+| `stream_layout` | v2 | Sensor stream layouts, both with frames of 70 and 46 bytes. `v2`: the light bumpers and their signals come in every 15 ms frame, so a `light_bumper_stop_signal` stop reacts within ~30 ms. `legacy`: the older layouts, proven clean on a Roomba 550; the light-bumper signals come only about 5 times a second, so such a stop can be up to ~0.2 s late (5 cm at 0.25 m/s). The flags (threshold 0), bumpers, cliffs and wheel drops are in every frame either way. |
 | `ignore_sensors` | [''] | Sensors to report as off everywhere, for a faulty unit, e.g. `['bump_right']` for a stuck bumper switch. |
 | `battery_gauge` | roomba | Where `battery_state` gets the charge from. `roomba`: the robot's own counter (stock battery). `voltage`: the pack voltage through a Li-ion curve, for another pack wired to the battery contacts, where the robot's mAh figures are made up. Set `battery_cells` (in series, default 5) and optionally `battery_capacity_ah`; the voltage is corrected for sag with `battery_internal_resistance_ohm` (0.1) and smoothed over `battery_smoothing_s` (30). |
 | `wheel_base_m`, `wheel_diameter_m`, `encoder_counts_per_rev` | 0.235, 0.072, 508.8 | Odometry geometry. |

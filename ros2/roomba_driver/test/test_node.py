@@ -1,6 +1,6 @@
 """node.py's driver logic on a fake robot and clock (no serial port, nothing spinning): the
-light-bumper stop on primary frames, a drop to Passive first seen in a secondary frame, and the
-end of the bump reflex."""
+light-bumper stop on primary frames, a drop to Passive first seen in a secondary frame, the end of
+the bump reflex, and the stream_layout parameter."""
 import pytest
 
 rclpy = pytest.importorskip('rclpy')
@@ -64,12 +64,12 @@ def frame(layout, mode, **values):
     return v
 
 
-def primary(mode, **values):
-    return frame(oi.STREAM_PRIMARY, mode, **values)
+def primary(mode, layout='v2', **values):
+    return frame(oi.stream_layouts(layout)[0], mode, **values)
 
 
-def secondary(mode, **values):
-    return frame(oi.STREAM_SECONDARY, mode, **values)
+def secondary(mode, layout='v2', **values):
+    return frame(oi.stream_layouts(layout)[1], mode, **values)
 
 
 def twist(x, z=0.0):
@@ -126,10 +126,10 @@ def robot(monkeypatch):
     d.close()
 
 
-@pytest.fixture
-def default(monkeypatch):
-    d = Driver(monkeypatch, {})
-    yield d
+@pytest.fixture(params=['v2', 'legacy'])
+def layout_driver(monkeypatch, request):
+    d = Driver(monkeypatch, {'stream_layout': request.param})
+    yield d, request.param
     d.close()
 
 
@@ -140,32 +140,53 @@ def test_light_bumper_stop_is_checked_on_every_primary_frame(robot):
     assert robot.log.take() == ['bumper hit: backing up']
 
 
-def test_drop_to_passive_first_seen_in_a_secondary_frame_waits_for_the_charger(default):
-    d = default
+def test_stream_layout_parameter(layout_driver, monkeypatch):
+    d, layout = layout_driver
+    started = []
+    monkeypatch.setattr(d.robot, 'open', lambda: None)
+    monkeypatch.setattr(d.robot, 'start_stream', lambda *args, **kwargs: started.append((args, kwargs)))
+    monkeypatch.setattr(d.robot, 'wait_for_frame', lambda timeout: False)
+    d.node._connect()
+    primary_ids, secondary_ids = oi.stream_layouts(layout)
+    assert started == [((primary_ids,), {'secondary_ids': secondary_ids})]
+
+
+def test_unknown_stream_layout_is_an_error(monkeypatch):
+    monkeypatch.setattr(driver_node, 'Roomba', FakeRobot)
+    rclpy.init(args=['--ros-args', '-p', 'port:=/nonexistent/roomba-test', '-p', 'stream_layout:=v3'])
+    try:
+        with pytest.raises(ValueError, match="stream_layout must be v2 or legacy, not 'v3'"):
+            driver_node.RoombaDriver()
+    finally:
+        rclpy.try_shutdown()
+
+
+def test_drop_to_passive_first_seen_in_a_secondary_frame_waits_for_the_charger(layout_driver):
+    d, layout = layout_driver
     # Docked: the drop and the charger come together, but the first frame showing the drop is a
     # secondary one, without the charger packet.
-    d.frame(secondary(oi.MODE_PASSIVE), 102.0)
+    d.frame(secondary(oi.MODE_PASSIVE, layout), 102.0)
     d.supervise(102.01)
     assert d.log.take() == []
-    d.frame(primary(oi.MODE_PASSIVE, home_base_available=True), 102.015)
+    d.frame(primary(oi.MODE_PASSIVE, layout, home_base_available=True), 102.015)
     d.supervise(102.06)
     assert d.log.take() == ['OI mode safe -> passive (home_base_available)']
     assert d.robot.modes == []                           # safe is not asked for on the charger
     # A drop without a reason (the OI restarted) is still undone once a primary frame confirms it.
     d.tick(102.1)
-    d.frame(secondary(oi.MODE_PASSIVE), 102.2)
+    d.frame(secondary(oi.MODE_PASSIVE, layout), 102.2)
     d.supervise(102.21)
     assert d.log.take() == ['OI mode passive -> safe']
-    d.frame(primary(oi.MODE_PASSIVE), 102.215)
+    d.frame(primary(oi.MODE_PASSIVE, layout), 102.215)
     d.supervise(102.26)
     assert d.log.take() == ['OI mode safe -> passive (no safety reason; re-entering safe)']
     assert d.robot.modes == [oi.MODE_SAFE]
     # Without any primary frame the drop is judged on what is known after CHARGER_WAIT_S.
-    d.frame(secondary(oi.MODE_SAFE), 102.3)
+    d.frame(secondary(oi.MODE_SAFE, layout), 102.3)
     d.supervise(102.31)
-    d.frame(secondary(oi.MODE_PASSIVE), 102.4)
+    d.frame(secondary(oi.MODE_PASSIVE, layout), 102.4)
     d.supervise(102.41)
-    d.frame(secondary(oi.MODE_PASSIVE), 103.0)
+    d.frame(secondary(oi.MODE_PASSIVE, layout), 103.0)
     d.supervise(103.39)
     assert d.log.take() == ['OI mode passive -> safe']
     d.supervise(103.41)

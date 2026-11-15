@@ -95,6 +95,9 @@ At 115200 baud, a frame must fit in 15 ms (≈172 bytes). **On the Roomba 550, s
 clean.** The driver therefore streams `[0, 4, 35, 43, 44, 45, 106, 58]` (70 bytes) every 15 ms and
 swaps in `[7, 9–12, 5, 43, 44, 52, 53, 107]` (46 bytes) about 5 times a second. The 70-byte set has
 everything the driver acts on, including the light-bumper signals for `light_bumper_stop_signal`.
+With `stream_layout: legacy` it streams the older, proven layouts instead: `[6, 43, 44, 45, 54, 55]`
+(70 bytes) and `[7, 9–12, 35, 43, 44, 106, 52, 53, 56, 57, 58]` (46 bytes), where the light-bumper
+signals come only with the 46-byte frame.
 
 ## Robot geometry (500 series)
 
