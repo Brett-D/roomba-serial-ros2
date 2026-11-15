@@ -92,8 +92,9 @@ Groups: 0 = 7–26, 1 = 7–16, 2 = 17–20, 3 = 21–26, 4 = 27–34, 5 = 35–
 
 At 115200 baud, a frame must fit in 15 ms (≈172 bytes). **On the Roomba 550, streaming group 100
 (84-byte frames) in Safe mode produced about 10% bad checksums; frames of 70 bytes or less were
-clean.** The driver therefore streams `[6, 43, 44, 45, 54, 55]` (70 bytes) every 15 ms and swaps in
-`[7, 9–12, 35, 43, 44, 106, 52, 53, 56, 57, 58]` (46 bytes) about 5 times a second.
+clean.** The driver therefore streams `[0, 4, 35, 43, 44, 45, 106, 58]` (70 bytes) every 15 ms and
+swaps in `[7, 9–12, 5, 43, 44, 52, 53, 107]` (46 bytes) about 5 times a second. The 70-byte set has
+everything the driver acts on, including the light-bumper signals for `light_bumper_stop_signal`.
 
 ## Robot geometry (500 series)
 

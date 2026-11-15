@@ -201,10 +201,13 @@ def stream_payload_length(ids):
 
 
 # Streaming every sensor in one frame (group 100, 84 bytes) makes the robot send frames with bad
-# checksums in Safe/Full mode, so the driver streams a ~70-byte primary set every 15 ms and swaps
-# in the remaining sensors (with the safety and odometry packets) a few times a second.
-STREAM_PRIMARY = [6, 43, 44, 45, 54, 55]
-STREAM_SECONDARY = [7, 9, 10, 11, 12, 35, 43, 44, 106, 52, 53, 56, 57, 58]
+# checksums in Safe/Full mode, so the driver streams a 70-byte primary set every 15 ms and swaps
+# in the remaining sensors (with the safety, mode and odometry packets) in a 46-byte frame a few
+# times a second. The primary set carries everything the driver acts on: bumps, wheel drops,
+# cliffs, the light bumpers with their signals (light_bumper_stop_signal is checked every frame),
+# the charger and the battery.
+STREAM_PRIMARY = [0, 4, 35, 43, 44, 45, 106, 58]
+STREAM_SECONDARY = [7, 9, 10, 11, 12, 5, 43, 44, 52, 53, 107]
 MAX_STREAM_FRAME = 172   # bytes that fit in 15 ms at 115200 baud
 
 

@@ -78,12 +78,15 @@ def test_stream_parser_accepts_alternating_layouts():
 def test_driver_stream_layouts_cover_every_sensor_and_fit():
     covered = set()
     for layout in (oi.STREAM_PRIMARY, oi.STREAM_SECONDARY):
-        assert oi.stream_payload_length(layout) + 3 <= 75
+        assert oi.stream_payload_length(layout) + 3 <= 70   # largest frames proven clean in Safe mode
         for pid in layout:
             covered.update(oi.packet_ids(pid))
         ids = {i for pid in layout for i in oi.packet_ids(pid)}
         assert {7, 9, 10, 11, 12, 35, 43, 44} <= ids   # safety + odometry in every frame
     assert covered == set(oi.GROUPS[100])
+    assert oi.stream_payload_length(oi.STREAM_PRIMARY) != oi.stream_payload_length(oi.STREAM_SECONDARY)
+    # The light-bumper stop (flags, front signals) is checked on every primary frame, not ~5 times a second.
+    assert {45, 47, 48, 49, 50} <= {i for pid in oi.STREAM_PRIMARY for i in oi.packet_ids(pid)}
 
 
 def test_drive_direct_sends_right_wheel_first_and_clamps():

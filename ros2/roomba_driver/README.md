@@ -84,7 +84,10 @@ The sensor stream (148/150), sensor polling (142/149) and the baud rate (129) ar
 driver. Polling and baud changes are also available in the Python library. Streaming every sensor
 in one 84-byte frame produces bad checksums in Safe mode, so the driver streams a 70-byte primary
 set every 15 ms and swaps in the remaining sensors about 5 times a second. Every frame includes
-bumps, cliffs, mode and encoders.
+bumps, cliffs, mode and encoders; the primary set also has the light bumpers with their signals,
+the charger and the battery, so the bump stops are checked on every 15 ms frame. A drop out of Safe
+mode first seen in the other set waits for the next primary frame (~15 ms) to tell a charger from
+an OI restart.
 
 ## Examples
 

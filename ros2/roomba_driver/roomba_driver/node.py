@@ -31,6 +31,11 @@ from roomba_driver.roomba import Roomba, RoombaError
 MODES = {'off': oi.MODE_OFF, 'passive': oi.MODE_PASSIVE, 'safe': oi.MODE_SAFE, 'full': oi.MODE_FULL}
 CONTROL_MODES = (oi.MODE_SAFE, oi.MODE_FULL)
 STALE_AFTER_S = 1.0  # sensor data older than this means contact with the robot is lost
+SUPERVISE_PERIOD_S = 0.05
+# Charger packet (34), which only the primary stream layout carries, and the longest wait for it
+# after a drop to Passive was seen in a secondary frame.
+CHARGER_FIELD = 'home_base_available'
+CHARGER_WAIT_S = 1.0
 BUMP_FIELDS = ('bump_left', 'bump_right')
 LIGHT_BUMP_FIELDS = ('light_bump_front_left', 'light_bump_center_left', 'light_bump_center_right',
                      'light_bump_front_right')
@@ -38,6 +43,12 @@ LIGHT_BUMP_FIELDS = ('light_bump_front_left', 'light_bump_center_left', 'light_b
 
 def _yaw_to_quaternion(yaw):
     return 0.0, 0.0, math.sin(yaw / 2.0), math.cos(yaw / 2.0)
+
+
+def _ticks(seconds):
+    """Supervisor ticks until a bump reflex step ends: the first tick at or after its end."""
+    # A step ending exactly on a tick ends on it, rather than timer jitter deciding on one more command.
+    return math.ceil(seconds / SUPERVISE_PERIOD_S - 1e-6)
 
 
 class RoombaDriver(Node):
@@ -113,7 +124,7 @@ class RoombaDriver(Node):
         self._values = {}
         self._odom_stamp = None
         self._mode = None
-        self._mode_event = None          # (previous, new, values) awaiting a log/publish
+        self._mode_event = None          # (previous, new, values, waiting since) awaiting a log/publish
         self._desired_mode = MODES[initial_mode]
         self._apply_initial_mode = True
         self._check_mode_at = None
@@ -123,7 +134,8 @@ class RoombaDriver(Node):
         self._driving_forward = False
         self._bumped = False
         self._bump_side = 0             # +1 hit on the left, -1 on the right
-        self._backup = None              # [(left_mm_s, right_mm_s, end monotonic), ...]
+        self._backup = None              # [(left_mm_s, right_mm_s, end supervisor tick), ...]
+        self._backup_start = 0.0         # monotonic time of the reflex's first supervisor tick
         self._backup_request = 0         # side of a bump waiting for the backup reflex
         self._backup_times = []          # monotonic starts of recent reflexes (rate limit)
         self._last_drive_time = 0.0
@@ -178,7 +190,7 @@ class RoombaDriver(Node):
         self.create_timer(1.0 / odom_rate, self._publish_odometry)
         self.create_timer(1.0 / sensor_rate, self._publish_sensors)
         self.create_timer(1.0 / battery_rate, self._publish_battery)
-        self.create_timer(0.05, self._supervise)
+        self.create_timer(SUPERVISE_PERIOD_S, self._supervise)
         self.create_timer(scroll_period, self._scroll_display)
         if wake_with_dtr and keep_awake_s > 0:
             self.create_timer(keep_awake_s, self._keep_awake, callback_group=MutuallyExclusiveCallbackGroup())
@@ -228,8 +240,16 @@ class RoombaDriver(Node):
                 self._odom_stamp = stamp
             mode = values['oi_mode']
             if mode != self._mode:
-                self._mode_event = (self._mode, mode, dict(self._values))
+                # A drop from Safe/Full to Passive without a cliff or wheel drop is re-entered unless
+                # the robot is on the charger, which only primary frames show. If a secondary frame
+                # shows the drop first, wait for the next primary frame: the charger state merged so
+                # far is from before the drop.
+                wait = (self._mode in CONTROL_MODES and mode == oi.MODE_PASSIVE
+                        and CHARGER_FIELD not in values and not self._blockers(self._values))
+                self._mode_event = (self._mode, mode, dict(self._values), monotonic if wait else None)
                 self._mode = mode
+            elif self._mode_event and self._mode_event[3] is not None and CHARGER_FIELD in values:
+                self._mode_event = (*self._mode_event[:2], dict(self._values), None)
             bumped = any(self._values.get(k) for k in BUMP_FIELDS) or (
                 self.bump_stop_light and any(self._light_bumped(k) for k in LIGHT_BUMP_FIELDS))
             newly_bumped = bumped and not self._bumped
@@ -270,12 +290,13 @@ class RoombaDriver(Node):
     def _start_backup(self, side, now):
         """Plan the bump reflex: reverse, then turn away from the side that was hit."""
         v = round(self.backup_speed * 1000)
-        reverse_s = self.backup_distance / self.backup_speed if self.backup_speed else 0.0
-        turn_s = self.backup_turn * self.wheel_base / 2 / self.backup_speed if self.backup_speed else 0.0
+        speed = self.backup_speed
+        reverse_s = min(self.backup_distance / speed, 1.5) if speed else 0.0
+        turn_s = min(self.backup_turn * self.wheel_base / 2 / speed, 1.0) if speed else 0.0
         # Hit on the left -> turn right (clockwise): left wheel forward, right wheel back.
         turn = (v, -v) if side > 0 else (-v, v)
-        self._backup = [(-v, -v, now + min(reverse_s, 1.5)),
-                        (turn[0], turn[1], now + min(reverse_s, 1.5) + min(turn_s, 1.0))]
+        self._backup_start = now
+        self._backup = [(-v, -v, _ticks(reverse_s)), (turn[0], turn[1], _ticks(reverse_s + turn_s))]
 
     def _run_backup(self, now):
         """Advance the bump reflex; returns True while it is in control of the wheels."""
@@ -288,7 +309,9 @@ class RoombaDriver(Node):
         if self._mode not in CONTROL_MODES:   # cliff / wheel drop: the firmware already stopped it
             self._backup = None
             return False
-        while self._backup and now >= self._backup[0][2]:
+        # Steps end on a count of supervisor ticks since the start, not on a clock comparison.
+        tick = round((now - self._backup_start) / SUPERVISE_PERIOD_S)
+        while self._backup and tick >= self._backup[0][2]:
             self._backup.pop(0)
         if not self._backup:
             self._backup = None
@@ -314,7 +337,11 @@ class RoombaDriver(Node):
                 lost = True
             else:
                 lost = False
-            event, self._mode_event = self._mode_event, None
+            event = self._mode_event
+            if event and event[3] is not None and now - event[3] < CHARGER_WAIT_S:
+                event = None                  # waiting for a primary frame (see _on_frame)
+            else:
+                self._mode_event = None
             have_data = self._mode is not None
         if lost:
             if self._try(self.robot.stop_drive, 'stop after losing contact'):
@@ -325,7 +352,7 @@ class RoombaDriver(Node):
                 'lost contact with the Roomba (asleep? In passive mode it sleeps after 5 minutes idle; '
                 'press Clean to wake it, or wire DTR to pin 5 and set wake_with_dtr)')
         if event:
-            self._report_mode_change(*event)
+            self._report_mode_change(*event[:3])
         if have_data and self._apply_initial_mode:
             self._apply_initial_mode = False
             if self._desired_mode in CONTROL_MODES:
