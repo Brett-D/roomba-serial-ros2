@@ -208,3 +208,26 @@ def test_bump_reflex_steps_end_on_supervisor_ticks_whatever_the_timer_jitter(rob
     assert writes.count(oi.drive_direct(100, -100)) == 10
     assert writes[-1] == STOP
     assert robot.log.take() == ['bump backup done']
+
+
+def test_battery_waits_for_a_frame_with_the_voltage(monkeypatch):
+    """Before any primary frame there are no battery packets: publish nothing (no KeyError)."""
+    t = [100.0]
+    monkeypatch.setattr(driver_node, 'Roomba', FakeRobot)
+    monkeypatch.setattr(driver_node.time, 'monotonic', lambda: t[0])
+    rclpy.init(args=['--ros-args', '-p', 'port:=/nonexistent/roomba-test'])
+    node = driver_node.RoombaDriver()
+    try:
+        published = []
+        monkeypatch.setattr(node.pub_battery, 'publish', published.append)
+        node._on_frame(secondary(oi.MODE_PASSIVE), 100.0)
+        node._supervise()
+        assert node._mode is not None
+        node._publish_battery()
+        assert published == []
+        node._on_frame(primary(oi.MODE_PASSIVE, voltage_mv=16000), 100.02)
+        node._publish_battery()
+        assert len(published) == 1 and abs(published[0].voltage - 16.0) < 1e-9
+    finally:
+        node.destroy_node()
+        rclpy.try_shutdown()

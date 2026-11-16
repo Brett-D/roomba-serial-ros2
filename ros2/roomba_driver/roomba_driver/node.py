@@ -221,10 +221,12 @@ class RoombaDriver(Node):
         self._connect_timer.cancel()
         if self.robot.wait_for_frame(2.0):
             values, _ = self.robot.latest()
+            # The first frame may be a secondary one without the battery packets: 0 like the Rust node.
+            g = lambda key: values.get(key, 0)  # noqa: E731
             self.get_logger().info(
-                f"connected: battery {values['voltage_mv'] / 1000:.2f} V, "
-                f"{values['charge_mah']}/{values['capacity_mah']} mAh, "
-                f"mode {oi.MODE_NAMES.get(values['oi_mode'], values['oi_mode'])}")
+                f"connected: battery {g('voltage_mv') / 1000:.2f} V, "
+                f"{g('charge_mah')}/{g('capacity_mah')} mAh, "
+                f"mode {oi.MODE_NAMES.get(g('oi_mode'), g('oi_mode'))}")
         else:
             self.get_logger().warning('port open but no sensor data yet; is the Roomba awake? '
                                       'Will keep retrying.')
@@ -703,6 +705,12 @@ class RoombaDriver(Node):
             if self._latest is None or self._mode is None:
                 return
             v, stamp = dict(self._latest[0]), self._latest[1]
+        # The primary layout carries the battery packets; nothing to report before it arrived.
+        if 'voltage_mv' not in v:
+            return
+        v = {key: v.get(key, 0) for key in ('voltage_mv', 'current_ma', 'temperature_c', 'charge_mah',
+                                             'capacity_mah', 'charging_state', 'home_base_available',
+                                             'internal_charger_available')}
         msg = BatteryState()
         msg.header.stamp = stamp.to_msg()
         msg.voltage = v['voltage_mv'] / 1000.0
