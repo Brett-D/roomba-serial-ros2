@@ -8,6 +8,8 @@ colcon build --packages-select roomba_msgs roomba_driver
 ros2 launch roomba_driver roomba_driver.launch.py
 ```
 
+The same node in Rust, with the same interfaces and parameters: [roomba_driver_rs](../roomba_driver_rs).
+
 ## Wiring
 
 | Adapter (jumper on **5V**) | Roomba Mini-DIN |
@@ -142,3 +144,6 @@ See `config/roomba_driver.yaml`. Important ones:
 ```bash
 cd ros2/roomba_driver && python3 -m pytest test
 ```
+
+`tools/ab_driver.sh` runs this driver and the Rust one on a simulated Roomba and compares them (see
+[roomba_driver_rs](../roomba_driver_rs/README.md#tests)).

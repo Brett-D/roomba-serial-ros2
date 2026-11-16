@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>roomba_driver_rs</name>
+  <version>0.1.0</version>
+  <description>ROS 2 driver for iRobot Roomba 500-series robots over the Open Interface (serial), in Rust (rclrs): a drop-in for roomba_driver with the same node name, topics, services, parameters, log lines and serial bytes. Needs a Rust toolchain (rustup); cargo fetches rclrs.</description>
+  <maintainer email="brett@example.com">brett</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <!-- rclrs generates its rcl bindings with bindgen -->
+  <build_depend>libclang-dev</build_depend>
+  <depend>builtin_interfaces</depend>
+  <depend>geometry_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>std_srvs</depend>
+  <depend>tf2_msgs</depend>
+  <depend>roomba_msgs</depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

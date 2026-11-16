@@ -1,0 +1,4 @@
+# GNU ld took 10+ minutes (100 % CPU) to link ekf_inputs against the ROS libraries; mold takes
+# seconds. Falls back to the default linker if mold is missing: install it with apt (mold).
+[target.aarch64-unknown-linux-gnu]
+rustflags = ["-C", "link-arg=-fuse-ld=mold"]

@@ -2,7 +2,7 @@
 
 Control an **iRobot Roomba 500-series** (tested on a Roomba 550) over its serial port: wiring
 diagrams, an Open Interface reference, a no-ROS command-line tool, and a **ROS 2 Jazzy driver**
-that exposes every function the robot supports.
+that exposes every function the robot supports, in Python and in Rust (the same interfaces).
 
 Built and tested with a Jetson Orin Nano Super (Ubuntu 24.04, ROS 2 Jazzy). Everything except the
 alternative Jetson-header wiring works on any Linux machine with a USB port.
@@ -18,7 +18,9 @@ alternative Jetson-header wiring works on any Linux machine with a USB port.
 | [docs/troubleshooting.md](docs/troubleshooting.md) | What worked, what didn't, and measurements: level shifters, 3.3 V, baud, sleep, checksums |
 | [examples/roomba_cli.py](examples/roomba_cli.py) | Command-line tool: sensors, beep, display text, drive, stop (no ROS needed) |
 | [ros2/roomba_driver](ros2/roomba_driver) | ROS 2 driver node plus a standalone Python library (see its [README](ros2/roomba_driver/README.md)) |
+| [ros2/roomba_driver_rs](ros2/roomba_driver_rs) | The same driver node in Rust (rclrs): same topics, services, parameters and serial bytes (see its [README](ros2/roomba_driver_rs/README.md)) |
 | [ros2/roomba_msgs](ros2/roomba_msgs) | Messages and services for the driver |
+| [tools/](tools) | A simulated Roomba on a pseudo-terminal (`fake_roomba.py`) and the Python vs Rust driver checks (`ab_driver.sh`) |
 
 ## Hardware
 
@@ -70,6 +72,15 @@ git clone https://github.com/Brett-D/roomba-serial-ros2.git
 cd ~/ros2_ws && colcon build --packages-select roomba_msgs roomba_driver
 source install/setup.bash
 ros2 launch roomba_driver roomba_driver.launch.py
+```
+
+Or the Rust driver (needs a Rust toolchain, see its [README](ros2/roomba_driver_rs/README.md)) with
+the same parameter file:
+
+```bash
+colcon build --packages-select roomba_msgs roomba_driver roomba_driver_rs
+ros2 run roomba_driver_rs roomba_driver --ros-args \
+  --params-file $(ros2 pkg prefix roomba_driver)/share/roomba_driver/config/roomba_driver.yaml
 ```
 
 ```bash

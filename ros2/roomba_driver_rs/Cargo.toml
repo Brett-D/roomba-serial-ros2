@@ -1,0 +1,26 @@
+[package]
+name = "roomba_driver_rs"
+version = "0.1.0"
+edition = "2021"
+description = "ROS 2 driver for iRobot Roomba 500-series robots over the Open Interface, in Rust: a drop-in for the Python roomba_driver node"
+license = "Apache-2.0"
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "roomba_driver"
+path = "src/bin/roomba_driver.rs"
+
+[dependencies]
+anyhow = "1"
+# Async service callbacks hand requests to the driver's service thread (rclrs uses futures 0.3 too).
+futures = "0.3"
+libc = "0.2"
+rclrs = "0.8"
+# Message crates (roomba_msgs, std_msgs, ...) from the share/<package>/rust directories on AMENT_PREFIX_PATH
+ros-env = "0.3"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
